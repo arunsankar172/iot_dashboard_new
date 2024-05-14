@@ -25,6 +25,23 @@ import {
   ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
 
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import Dashboard from './src/screens/dashboard';
+import Rooms from './src/screens/rooms';
+import Spectrums from './src/screens/spectrums';
+import SQL from './src/screens/sql';
+import Signup from './src/screens/signup';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import Settings from './src/screens/settings';
+import Icon from 'react-native-vector-icons/AntDesign';
+import Ionicons from 'react-native-vector-icons/Ionicons'; // Change the icon library according to your preference
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons'; // Change the icon library according to your preference
+import Device from './src/screens/devices';
+
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
 type SectionProps = PropsWithChildren<{
   title: string;
 }>;
@@ -63,36 +80,72 @@ function App(): React.JSX.Element {
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    // <NavigationContainer>
+    //   <Stack.Navigator
+    //     screenOptions={{
+    //       headerShown: false,
+    //     }}>
+    //     <Stack.Screen name="Rooms" component={SQL} />
+    //   </Stack.Navigator>
+    // </NavigationContainer>
+
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}>
+        <Tab.Screen
+          name="Home"
+          component={Dashboard}
+          options={{
+            tabBarIcon: ({size, focused, color}) => {
+              return <Icon name={'home'} size={size} color={color} />;
+            },
+          }}
+        />
+        <Tab.Screen
+          name="Spectrum"
+          component={Spectrums}
+          options={{
+            tabBarIcon: ({size, focused, color}) => {
+              return (
+                <Ionicons
+                  name={'color-filter-outline'}
+                  size={size}
+                  color={color}
+                />
+              );
+            },
+          }}
+        />
+        <Tab.Screen
+          name="Devices"
+          component={Device}
+          options={{
+            tabBarIcon: ({size, focused, color}) => {
+              return (
+                <MaterialIcons
+                  name={'devices-other'}
+                  size={size}
+                  color={color}
+                />
+              );
+            },
+          }}
+        />
+        <Tab.Screen
+          name="Settings"
+          component={Settings}
+          options={{
+            tabBarIcon: ({size, focused, color}) => {
+              return (
+                <Ionicons name={'settings-outline'} size={size} color={color} />
+              );
+            },
+          }}
+        />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 }
 
