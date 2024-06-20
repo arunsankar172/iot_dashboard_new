@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,8 +13,9 @@ import {
   Alert,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import SQLite from 'react-native-sqlite-storage';
 
-export default function Login() {
+export default function Login({navigation}) {
   const numberOfInputs = 4;
   const inputs = Array.from(
     {
@@ -22,6 +23,28 @@ export default function Login() {
     },
     () => useRef(),
   );
+
+  const [userData, setUserData] = useState({});
+
+  useEffect(() => {
+    const db = SQLite.openDatabase({
+      name: 'iot_dashboard.db',
+      location: 'default',
+    });
+
+    db.transaction(tx => {
+      tx.executeSql('SELECT * FROM users', [], (tx, results) => {
+        console.log('Query completed 3');
+        var len = results.rows.length;
+        for (let i = 0; i < len; i++) {
+          let row = results.rows.item(i);
+          setUserData(row);
+          console.log(`Username: ${row.username}, Pin: ${row.login_pin}`);
+        }
+      });
+    });
+  }, []);
+
   const [inputValues, setInputValues] = useState(
     Array(numberOfInputs).fill(''),
   );
@@ -45,6 +68,21 @@ export default function Login() {
 
   const handleGetAllValues = () => {
     Alert.alert('All Input Values', inputValues.join(''));
+  };
+
+  const handleLoginConfirm = () => {
+    console.log('UserData: ' + JSON.stringify(userData));
+    if (inputValues.join('').length == 4) {
+      if (inputValues.join('') === userData.login_pin) {
+        setInputValues([]);
+        Alert.alert('Authentication Success ', inputValues.join(''));
+        navigation.navigate('DashboardMain');
+      } else {
+        Alert.alert('Pin does not match! ', inputValues.join(''));
+      }
+    } else {
+      Alert.alert('Please enter valid PIN to continue');
+    }
   };
 
   return (
@@ -80,7 +118,18 @@ export default function Login() {
           />
         ))}
       </View>
-      <Button title="Get All Values" onPress={handleGetAllValues} />
+      <TouchableOpacity
+        style={{
+          marginTop: 100,
+          margin: 100,
+          padding: 10,
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: '#22c55e',
+        }}
+        onPress={handleLoginConfirm}>
+        <Text style={{textAlign: 'center', color: '#22c55e'}}>Login</Text>
+      </TouchableOpacity>
     </View>
   );
 }

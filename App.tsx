@@ -33,11 +33,12 @@ import Spectrums from './src/screens/spectrums';
 import SQL from './src/screens/sql';
 import Signup from './src/screens/signup';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import Settings from './src/screens/settings';
+import Settings from './src/screens/routines';
 import Icon from 'react-native-vector-icons/AntDesign';
-import Ionicons from 'react-native-vector-icons/Ionicons'; // Change the icon library according to your preference
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons'; // Change the icon library according to your preference
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Device from './src/screens/devices';
+import Navigation from './src/navigation/navigation';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -85,67 +86,68 @@ function App(): React.JSX.Element {
     //     screenOptions={{
     //       headerShown: false,
     //     }}>
-    //     <Stack.Screen name="Rooms" component={SQL} />
+    //     <Stack.Screen name="Rooms" component={Signup} />
     //   </Stack.Navigator>
     // </NavigationContainer>
 
-    <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}>
-        <Tab.Screen
-          name="Home"
-          component={Dashboard}
-          options={{
-            tabBarIcon: ({size, focused, color}) => {
-              return <Icon name={'home'} size={size} color={color} />;
-            },
-          }}
-        />
-        <Tab.Screen
-          name="Spectrum"
-          component={Spectrums}
-          options={{
-            tabBarIcon: ({size, focused, color}) => {
-              return (
-                <Ionicons
-                  name={'color-filter-outline'}
-                  size={size}
-                  color={color}
-                />
-              );
-            },
-          }}
-        />
-        <Tab.Screen
-          name="Devices"
-          component={Device}
-          options={{
-            tabBarIcon: ({size, focused, color}) => {
-              return (
-                <MaterialIcons
-                  name={'devices-other'}
-                  size={size}
-                  color={color}
-                />
-              );
-            },
-          }}
-        />
-        <Tab.Screen
-          name="Settings"
-          component={Settings}
-          options={{
-            tabBarIcon: ({size, focused, color}) => {
-              return (
-                <Ionicons name={'settings-outline'} size={size} color={color} />
-              );
-            },
-          }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+    // <NavigationContainer>
+    //   <Tab.Navigator
+    //     screenOptions={{
+    //       headerShown: false,
+    //     }}>
+    //     <Tab.Screen
+    //       name="Home"
+    //       component={Dashboard}
+    //       options={{
+    //         tabBarIcon: ({size, focused, color}) => {
+    //           return <Icon name={'home'} size={size} color={color} />;
+    //         },
+    //       }}
+    //     />
+    //     <Tab.Screen
+    //       name="Spectrum"
+    //       component={Spectrums}
+    //       options={{
+    //         tabBarIcon: ({size, focused, color}) => {
+    //           return (
+    //             <Ionicons
+    //               name={'color-filter-outline'}
+    //               size={size}
+    //               color={color}
+    //             />
+    //           );
+    //         },
+    //       }}
+    //     />
+    //     <Tab.Screen
+    //       name="Devices"
+    //       component={Device}
+    //       options={{
+    //         tabBarIcon: ({size, focused, color}) => {
+    //           return (
+    //             <MaterialIcons
+    //               name={'devices-other'}
+    //               size={size}
+    //               color={color}
+    //             />
+    //           );
+    //         },
+    //       }}
+    //     />
+    //     <Tab.Screen
+    //       name="Settings"
+    //       component={Settings}
+    //       options={{
+    //         tabBarIcon: ({size, focused, color}) => {
+    //           return (
+    //             <Ionicons name={'settings-outline'} size={size} color={color} />
+    //           );
+    //         },
+    //       }}
+    //     />
+    //   </Tab.Navigator>
+    // </NavigationContainer>
+    <Navigation />
   );
 }
 

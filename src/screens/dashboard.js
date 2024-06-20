@@ -16,6 +16,7 @@ import {
   Switch,
   TouchableWithoutFeedback,
   ScrollView,
+  TouchableHighlight,
   NativeModules,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
@@ -30,62 +31,53 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import NetInfo from '@react-native-community/netinfo';
 import axios from 'axios';
+import SQLite from 'react-native-sqlite-storage';
 
 const {WifiScanner} = NativeModules;
 
 import {updateChannel, updateSchedules} from '../service/service_handler';
+import DashboardMain from '../navigation/dashboard_main';
+import Device from './devices';
 
-const data = [
+const data1 = [
   {
-    label: 'Item 1',
-    value: '1',
+    spectrumName: 'Spectrum 1',
+    spectrumId: '1',
   },
   {
-    label: 'Item 2',
-    value: '2',
+    spectrumName: 'Spectrum 2',
+    spectrumId: '2',
   },
   {
-    label: 'Item 3',
-    value: '3',
+    spectrumName: 'Spectrum 3',
+    spectrumId: '3',
   },
   {
-    label: 'Item 4',
-    value: '4',
+    spectrumName: 'Spectrum 4',
+    spectrumId: '4',
   },
   {
-    label: 'Item 5',
-    value: '5',
-  },
-  {
-    label: 'Item 6',
-    value: '6',
-  },
-  {
-    label: 'Item 7',
-    value: '7',
-  },
-  {
-    label: 'Item 8',
-    value: '8',
+    spectrumName: 'Spectrum 5',
+    spectrumId: '5',
   },
 ];
 
 const spectrum_data = [
   {
     channelName: 'Channel 1',
-    channelValue: 10,
+    channelValue: 0,
     isActive: true,
     colorCode: '#fef2f2',
   },
   {
     channelName: 'Channel 2',
-    channelValue: 20,
+    channelValue: 0,
     isActive: true,
     colorCode: '#fffbeb',
   },
   {
     channelName: 'Channel 3',
-    channelValue: 20,
+    channelValue: 0,
     isActive: true,
     colorCode: '#f0fdfa',
   },
@@ -162,7 +154,7 @@ const ColorPicker = ({selectedColor, onSelectColor}) => {
   );
 };
 
-export default function Dashboard() {
+export default function Dashboard({navigation}) {
   const roomCount = 10;
   const rooms = Array.from(
     {
@@ -173,34 +165,61 @@ export default function Dashboard() {
   const [value, setValue] = useState(null);
   const [isFocus, setIsFocus] = useState(false);
   const [sliderValue, setSliderValue] = useState(10);
-  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [SaveSpectrumModalVisible, setSaveSpectrumModalVisible] =
+    useState(false);
   const [nameModalVisible, setNameModalVisible] = useState(false);
-  const [deleteMmodalVisible, setDeleteModalVisible] = useState(false);
+  const [settingsModaVisible, setSettingsModalVisible] = useState(false);
   const [saveMmodalVisible, setSaveModalVisible] = useState(false);
   const [spectrumSaveDisabled, setSpectrumSaveDisabled] = useState(true);
-  const [spectrum, setSpectrum] = useState(spectrum_data);
-  const [lockRatio, setLockRatio] = useState(true);
+  const [spectrum, setSpectrum] = useState([]);
+  const [spectrumControlActive, setSpectrumControlActive] = useState({});
+  const [spectrumControlList, setSpectrumControlList] = useState([]);
+  const [lockRatio, setLockRatio] = useState(false);
   const [editedChannelName, setEditedChannelName] = useState('');
   const [selectedColor, setSelectedColor] = useState(null);
+  const [newSpectrumName, setNewSpectrumname] = useState('');
 
   const [wifiList, setWifiList] = useState([]);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [connectedSSID, setConnectedSSID] = useState('');
   const [gateway, setGateway] = useState('');
+  const [isRatioEnabled, setIsRatioEnabled] = useState(false);
+  const [isDisabled, setIsDisabled] = useState(false);
+
+  const db = SQLite.openDatabase({
+    name: 'iot_dashboard.db',
+    location: 'default',
+  });
 
   useEffect(() => {
+    getAndSetSpectrum();
+    navigation.dispatch(DashboardMain);
     const unsubscribe = NetInfo.addEventListener(state => {
       if (state.type === 'wifi' && state.isConnected) {
         setConnectedSSID(state.details.ssid);
-        WifiScanner.getGatewayIPAddress()
-          .then(ip => {
-            setGateway(ip);
-          })
-          .catch(error => {
-            console.error('Error getting gateway IP address:', error);
-          });
+        setIsDisabled(false);
+        console.log('Wifi Connected');
+        // Logic to check SSID patten in wifi name
+        // call esp to get name and channel data
+        if (connectedSSID == 'AndroidWifi') {
+          console.log('ESP connectedd');
+          const espData = {
+            deviceName: 'AndroidWifi', //ssid extracted
+            channelCount: 4,
+          };
+          // getSpectrumOrCreateTables(espData);
+        }
+        // WifiScanner.getGatewayIPAddress()
+        //   .then(ip => {
+        //     setGateway(ip);
+        //   })
+        //   .catch(error => {
+        //     console.error('Error getting gateway IP address:', error);
+        //     setIsDisabled(true);
+        //   });
       } else {
         setConnectedSSID('');
+        setIsDisabled(true);
       }
     });
 
@@ -208,6 +227,148 @@ export default function Dashboard() {
       unsubscribe();
     };
   }, []);
+
+  const getSpectrumOrCreateTables = espData => {
+    db.transaction(async tx => {
+      var isDeviceExists = false;
+      await tx.executeSql(
+        'SELECT * FROM device_nodes WHERE device_name =?',
+        [espData.deviceName],
+        (tx, results) => {
+          console.log('check device nodes');
+          var len = results.rows.length;
+          if (length == 0) {
+            console.log('Device Not found');
+            isDeviceExists = false;
+            // create device and spectrum
+            createSpectrum(espData);
+            // console.log('created spectrum');
+          } else {
+            for (let i = 0; i < len; i++) {
+              let row = results.rows.item(i);
+              console.log(
+                `Device Name: ${row.device_name}, Serial: ${row.device_serial}`,
+              );
+              if (row.device_serial == 'AndroidWifi') {
+                console.log('Found device');
+                getAndSetSpectrum(espData.deviceName);
+                break;
+              }
+            }
+          }
+        },
+        error => {
+          console.error('Error retrieving data:', error);
+          isDeviceExists = false;
+          // setIsDisabled(true);
+        },
+      );
+      // tx.executeSql(
+      //   'CREATE TABLE IF NOT EXISTS device_nodes ( device_id INTEGER PRIMARY KEY AUTOINCREMENT, device_name TEXT, device_serial TEXT, channel_count INTEGER, status INTEGER);',
+      // );
+      // console.log('Created device table');
+      // const device_serial = connectedSSID;
+      // //do additional proocess to check device serial
+      // tx.executeSql(
+      //   'INSERT INTO device_nodes (device_name, device_serial, channel_count, status) VALUES (?, ?,?,?)',
+      //   [device_serial, device_serial, 0, 3],
+      // );
+      // console.log('Inserted device table');
+
+      // tx.executeSql(
+      //   'SELECT * FROM device_nodes',
+      //   [],
+      //   (tx, results) => {
+      //     console.log('check device nodes');
+      //     var len = results.rows.length;
+      //     for (let i = 0; i < len; i++) {
+      //       let row = results.rows.item(i);
+      //       console.log(
+      //         `Device Name: ${row.device_name}, Serial: ${row.device_serial}`,
+      //       );
+      //       if (row.device_serial == 'AndroidWifi') {
+      //         console.log('Found device');
+      //         isDeviceExists = true;
+      //         break;
+      //       }
+      //     }
+      //   },
+      //   error => {
+      //     console.error('Error retrieving data1:', error);
+      //     isDeviceExists = false;
+      //     // setIsDisabled(true);
+      //   },
+      // );
+      // tx.executeSql(
+      //   'CREATE TABLE IF NOT EXISTS spectrum_controls ( spectrum_control_id INTEGER PRIMARY KEY AUTOINCREMENT, channel_data TEXT, lock_ratio INTEGER, spectrum_name TEXT, status INTEGER);',
+      // );
+      // console.log('Created spectrum table');
+      // tx.executeSql(
+      //   'INSERT INTO spectrum_controls (channel_data, lock_ratio, spectrum_name, status) VALUES (?, ?,?,?)',
+      //   [JSON.stringify(channel_data), 0, 'Default Spectrum', 1],
+      // );
+      // tx.executeSql('SELECT * FROM spectrum_controls', [], (tx, results) => {
+      //   console.log('Query completed 4');
+      //   var len = results.rows.length;
+      //   for (let i = 0; i < len; i++) {
+      //     let row = results.rows.item(i);
+      //     console.log(
+      //       `Spectrum Name: ${row.spectrum_name}, Lock Ratio: ${row.status}`,
+      //     );
+      //   }
+      // });
+    });
+  };
+
+  const createSpectrum = espData => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS spectrum_controls ( spectrum_control_id INTEGER PRIMARY KEY AUTOINCREMENT, channel_data TEXT, lock_ratio INTEGER, spectrum_name TEXT, device_serial TEXT,status INTEGER);',
+      );
+      console.log('Created spectrum table');
+      tx.executeSql(
+        'INSERT INTO spectrum_controls (channel_data, lock_ratio, spectrum_name, status) VALUES (?, ?,?,?)',
+        [
+          JSON.stringify(channel_data),
+          0,
+          'Default Spectrum',
+          espData.deviceName,
+          1,
+        ],
+      );
+    });
+  };
+
+  const getAndSetSpectrum = () => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM spectrum_controls WHERE status=1',
+        [],
+        (tx, results) => {
+          console.log('Query completed 4');
+          var len = results.rows.length;
+          console.log(
+            'DB Channel Data : ' +
+              results.rows.item(0).channel_data +
+              ' Spectrum Id: ' +
+              results.rows.item(0).spectrum_control_id,
+          );
+          setSpectrumControlActive(results.rows.item(0));
+          setSpectrum(JSON.parse(results.rows.item(0).channel_data));
+          setLockRatio(results.rows.item(0).lock_ratio == 1 ? true : false);
+        },
+      );
+      tx.executeSql('SELECT * FROM spectrum_controls;', [], (tx, results) => {
+        console.log('Query completed 4');
+        var len = results.rows.length;
+        const spectrum_list = [];
+        for (let i = 0; i < len; i++) {
+          spectrum_list.push(results.rows.item(i));
+        }
+        setSpectrumControlList(spectrum_list);
+      });
+    });
+  };
 
   const changeSliderState = (event, index) => {
     console.log('Channel toggle clicked for channel #' + (index + 1));
@@ -281,8 +442,8 @@ export default function Dashboard() {
   };
 
   const saveSpectrumUpdate = () => {
-    console.log('save clicked');
-    setSpectrumSaveDisabled(true);
+    console.log('save clicked id:' + spectrumControlActive.spectrum_control_id);
+
     const scheduleData = [
       {
         spectrumName: 'Spectrum1',
@@ -301,6 +462,27 @@ export default function Dashboard() {
         action: 'OFF',
       },
     ];
+    db.transaction(tx => {
+      tx.executeSql(
+        'UPDATE spectrum_controls SET status=0;;',
+        [],
+        (tx, results) => {
+          console.log('Query completed 7');
+        },
+      );
+      tx.executeSql(
+        'UPDATE spectrum_controls SET channel_data=?, lock_ratio=?, status=1 WHERE spectrum_control_id=?;',
+        [
+          JSON.stringify(spectrum),
+          lockRatio,
+          spectrumControlActive.spectrum_control_id,
+        ],
+        (tx, results) => {
+          console.log('Query completed 7');
+          setSpectrumSaveDisabled(true);
+        },
+      );
+    });
     // updateSchedules(scheduleData)
     //   .then(function (response) {
     //     console.log('response');
@@ -309,23 +491,115 @@ export default function Dashboard() {
     //   .catch(error => {
     //     console.log('service-error', error);
     //   });
-    axios
-      .get('http://192.168.4.1/iot/channel')
-      .then(response => {
-        console.log(response.data);
-      })
-      .catch(error => {
-        console.error('Error fetching data: ', error);
+    // axios
+    //   .get('http://192.168.4.1/iot/channel')
+    //   .then(response => {
+    //     console.log(response.data);
+    //   })
+    //   .catch(error => {
+    //     console.error('Error fetching data: ', error);
+    //   });
+  };
+
+  const cancelSaveSpectrum = () => {
+    console.log('cancel Save New spectrum');
+    setSaveSpectrumModalVisible(false);
+    setNewSpectrumname('');
+  };
+
+  const confirmSaveSpectrum = () => {
+    console.log('Save New Spectrum confirm - ' + newSpectrumName);
+
+    db.transaction(tx => {
+      tx.executeSql(
+        'UPDATE spectrum_controls SET status=0;;',
+        [],
+        (tx, results) => {
+          console.log('Query completed 7');
+        },
+      );
+      tx.executeSql(
+        'INSERT INTO spectrum_controls (channel_data, lock_ratio, spectrum_name, status) VALUES (?, ?,?,?)',
+        [JSON.stringify(spectrum), 0, newSpectrumName, 1],
+      );
+      tx.executeSql('SELECT * FROM spectrum_controls', [], (tx, results) => {
+        console.log('Query completed 4');
+        var len = results.rows.length;
+        for (let i = 0; i < len; i++) {
+          let row = results.rows.item(i);
+          console.log(
+            `Spectrum Name: ${row.spectrum_name}, Lock Ratio: ${row.status}`,
+          );
+        }
       });
+    });
+    getAndSetSpectrum();
+    setSaveSpectrumModalVisible(false);
+    setNewSpectrumname('');
+  };
+
+  const cancelSaveEditChannel = () => {
+    console.log('cancel Save edit channel');
+    setNameModalVisible(false);
+  };
+
+  const confirmSaveEditChannel = () => {
+    console.log('edit channel name save confirm');
+    setNameModalVisible(false);
+  };
+
+  const cancelSaveSettings = () => {
+    console.log('cancel Save settings');
+    setSettingsModalVisible(false);
+  };
+
+  const confirmSaveSettings = () => {
+    console.log(
+      'confirm settings ' + spectrumControlActive.spectrum_control_id,
+    );
+    const lock_ratio = isRatioEnabled ? 1 : 0;
+    db.transaction(tx => {
+      tx.executeSql(
+        'UPDATE spectrum_controls SET lock_ratio=? WHERE spectrum_control_id=?;',
+        [lockRatio, spectrumControlActive.spectrum_control_id],
+        (tx, results) => {
+          console.log('Query completed 6');
+        },
+      );
+    });
+    setSettingsModalVisible(false);
+  };
+
+  const spectrumDropDownChange = item => {
+    console.log('Spectrum Dropdown Change  ' + JSON.stringify(item));
+    setSpectrumSaveDisabled(false);
+    setSpectrumControlActive(item);
+    setSpectrum(JSON.parse(item.channel_data));
+    setLockRatio(item.lock_ratio == 1 ? true : false);
+    setIsFocus(false);
+  };
+
+  const toggleSwitch = () => {
+    setSpectrumSaveDisabled(!spectrumSaveDisabled);
+    setLockRatio(previousState => !previousState);
+  };
+
+  const changeSliderStateCompleted = () => {
+    console.log('slided-change-completed');
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        isDisabled && {backgroundColor: 'rgba(0, 0, 0, 0.3)'},
+      ]}>
       <View
         style={{
           backgroundColor: '#f5f5f5',
           flex: 1,
-          borderRadius: 16,
+          borderBottomLeftRadius: 16,
+          borderBottomRightRadius: 16,
         }}>
         <Text
           style={{
@@ -355,9 +629,12 @@ export default function Dashboard() {
           <Ionicons name="notifications-outline" size={24} color="black" />
         </View>
       </View>
+
+      {/* Main View */}
       <View
         style={{
           flex: 6,
+          backgroundColor: '#FFFFFF',
         }}>
         <View
           style={{
@@ -385,25 +662,31 @@ export default function Dashboard() {
               selectedTextStyle={styles.selectedTextStyle}
               inputSearchStyle={styles.inputSearchStyle}
               // iconStyle={styles.iconStyle}
-              data={data}
-              maxHeight={250}
-              labelField="label"
-              valueField="value"
+              data={spectrumControlList}
+              maxHeight={200}
+              labelField="spectrum_name"
+              valueField="spectrum_control_id"
               placeholder={!isFocus ? 'Select Spectrum' : 'Select Spectrumm'}
-              value={value}
+              value={spectrumControlActive.spectrum_control_id}
               onFocus={() => setIsFocus(true)}
               onBlur={() => setIsFocus(false)}
-              onChange={item => {
-                setValue(item.value);
-                setIsFocus(false);
-              }}
+              onChange={item => spectrumDropDownChange(item)}
             />
           </View>
 
           <Pressable
-            style={{marginTop: 8, marginLeft: -30}}
+            style={{marginTop: 7, marginLeft: -15}}
+            onPress={() => setSaveSpectrumModalVisible(true)}>
+            <MaterialCommunityIcons
+              name="content-save-cog-outline"
+              size={20}
+              color="#171717"
+            />
+          </Pressable>
+          <Pressable
+            style={{marginTop: 7, marginLeft: -15}}
             onPress={() => setSettingsModalVisible(true)}>
-            <Ionicons name="settings-outline" size={18} color="#171717" />
+            <Ionicons name="settings-outline" size={20} color="#171717" />
           </Pressable>
         </View>
 
@@ -416,7 +699,9 @@ export default function Dashboard() {
             style={{
               height: 30,
               borderRadius: 4,
-              margin: 5,
+              // margin: 5,
+              marginTop: 5,
+              marginRight: 5,
               fontSize: 18,
               borderWidth: 1,
               padding: 6,
@@ -428,18 +713,76 @@ export default function Dashboard() {
             selectedColor={selectedColor}
             onSelectColor={handleColorSelect}
           />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              marginTop: 10,
+            }}>
+            <TouchableOpacity onPress={cancelSaveEditChannel}>
+              <Text style={{color: '#ef4444', marginLeft: 10}}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={confirmSaveEditChannel}>
+              <Text style={{color: '#0ea5e9', marginLeft: 10}}>Save</Text>
+            </TouchableOpacity>
+          </View>
         </Popup>
 
         <Popup
-          visible={settingsModalVisible}
+          visible={SaveSpectrumModalVisible}
+          title="Save Spectrum"
+          onClose={() => setSaveSpectrumModalVisible(false)}>
+          <Text>Enter new spectrum name</Text>
+          <TextInput
+            placeholder="New Spectrum Name"
+            style={{
+              height: 30,
+              borderRadius: 4,
+              marginTop: 5,
+              marginBottom: 5,
+              fontSize: 14,
+              borderWidth: 1,
+              padding: 6,
+            }}
+            onChangeText={setNewSpectrumname}
+            value={newSpectrumName}
+          />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              marginTop: 10,
+            }}>
+            <TouchableOpacity onPress={cancelSaveSpectrum}>
+              <Text style={{color: '#ef4444', marginLeft: 10}}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={confirmSaveSpectrum}>
+              <Text style={{color: '#0ea5e9', marginLeft: 10}}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </Popup>
+
+        <Popup
+          visible={settingsModaVisible}
+          title="Spectrum Settings"
           onClose={() => setSettingsModalVisible(false)}>
-          <Text>This is the popup content. for Settings</Text>
-        </Popup>
-
-        <Popup
-          visible={deleteMmodalVisible}
-          onClose={() => setDeleteModalVisible(false)}>
-          <Text>This is the popup content. for Delete</Text>
+          <Text>Enable/Disable Lock ratio</Text>
+          <View style={{alignItems: 'center', justifyContent: 'center'}}>
+            <Switch onValueChange={toggleSwitch} value={lockRatio} />
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              marginTop: 10,
+            }}>
+            <TouchableOpacity onPress={cancelSaveSettings}>
+              <Text style={{color: '#ef4444', marginLeft: 10}}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={confirmSaveSettings}>
+              <Text style={{color: '#0ea5e9', marginLeft: 10}}>Save</Text>
+            </TouchableOpacity>
+          </View>
         </Popup>
 
         <ScrollView>
@@ -510,7 +853,7 @@ export default function Dashboard() {
                     onValueChange={e => changeSliderState(e, index)}
                     value={channel.isActive}
                   />
-                  {/* <Pressable onPress={() => setDeleteModalVisible(true)}>
+                  {/* <Pressable onPress={() => setSettingsModalVisible(true)}>
                     <MaterialIcons
                       style={{
                         marginTop: 12,
@@ -530,6 +873,7 @@ export default function Dashboard() {
                 maximumTrackTintColor="grey"
                 thumbTintColor="blue"
                 onValueChange={e => handleSliderChange(e, index)}
+                onTouchEndCapture={changeSliderStateCompleted}
                 value={
                   typeof channel.channelValue === 'number'
                     ? channel.channelValue >= 100
@@ -560,23 +904,62 @@ export default function Dashboard() {
             color="#404040"
           />
         </TouchableOpacity>
+
+        {isDisabled && (
+          <View
+            style={{
+              width: '100%',
+              height: '100%',
+              position: 'absolute',
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              padding: 30,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Button
+              style={{borderRadius: 20}}
+              title=" Connect to Device "
+              onPress={() => navigation.navigate('Devices')}
+            />
+          </View>
+        )}
       </View>
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          width: '100%',
-          backgroundColor: '#86efac',
-          height: 20,
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexDirection: 'row',
-        }}>
-        <MaterialCommunityIcons name="wifi" size={16} color="black" />
-        <Text style={{color: 'black', marginLeft: 8}}>
-          Connected to - {connectedSSID}
-        </Text>
-      </View>
+
+      {!isDisabled && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            width: '100%',
+            backgroundColor: '#86efac',
+            height: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            flexDirection: 'row',
+          }}>
+          <MaterialCommunityIcons name="wifi" size={16} color="black" />
+          <Text style={{color: 'black', marginLeft: 8}}>
+            Connected to - {connectedSSID}
+          </Text>
+        </View>
+      )}
+
+      {isDisabled && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            width: '100%',
+            backgroundColor: '#ef4444',
+            height: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            flexDirection: 'row',
+          }}>
+          <MaterialCommunityIcons name="wifi" size={16} color="black" />
+          <Text style={{color: 'black', marginLeft: 8}}>Disconnected</Text>
+        </View>
+      )}
     </View>
   );
 }

@@ -15,6 +15,7 @@ import {
   PermissionsAndroid,
   FlatList,
   Platform,
+  Linking,
   NativeModules,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
@@ -23,7 +24,7 @@ import AntDesign from 'react-native-vector-icons/AntDesign';
 
 const {WifiScanner} = NativeModules;
 
-export default function Device() {
+export default function Device({navigation}) {
   const [wifiList, setWifiList] = useState([]);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [connectedSSID, setConnectedSSID] = useState('');
@@ -124,6 +125,41 @@ export default function Device() {
     }
   };
 
+  const openWifiSettings = async () => {
+    if (Platform.OS === 'ios') {
+      // Check iOS version to use the appropriate method
+      const systemVersion = await DeviceInfo.getSystemVersion();
+      const majorVersion = parseInt(systemVersion.split('.')[0], 10);
+
+      if (majorVersion >= 11) {
+        // Use a more general settings approach
+        Linking.openURL('App-Prefs:root=General').catch(() => {
+          Alert.alert(
+            'Failed to open settings',
+            'Unable to open general settings.',
+          );
+        });
+      } else {
+        // Use App-Prefs:root=WIFI for older iOS versions
+        Linking.openURL('App-Prefs:root=WIFI').catch(() => {
+          Alert.alert(
+            'Failed to open settings',
+            'Unable to open Wi-Fi settings.1',
+          );
+        });
+      }
+    } else {
+      // Android: Use direct Wi-Fi settings intent
+      Linking.openURL(
+        'content://com.android.settings/.wifi.WifiSettings',
+      ).catch(() => {
+        Alert.alert(
+          'Failed to open settings',
+          'Unable to open Wi-Fi settings.2',
+        );
+      });
+    }
+  };
   return (
     // <View style={styles.container}>
     //   <View
@@ -192,15 +228,17 @@ export default function Device() {
           margin: 20,
           flexDirection: 'row',
         }}>
-        <AntDesign
-          name="arrowleft"
-          size={16}
-          style={{
-            fontSize: 22,
-            color: '#171717',
-            marginTop: 3,
-          }}
-        />
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <AntDesign
+            name="arrowleft"
+            size={16}
+            style={{
+              fontSize: 22,
+              color: '#171717',
+              marginTop: 3,
+            }}
+          />
+        </TouchableOpacity>
         <Text
           style={{
             fontSize: 20,
@@ -259,6 +297,10 @@ export default function Device() {
           </View>
         )}
       </ScrollView>
+
+      <View style={{marginTop: 50}}>
+        <Button title="Open Wi-Fi Settings" onPress={openWifiSettings} />
+      </View>
     </View>
   );
 }

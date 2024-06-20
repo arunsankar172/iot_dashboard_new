@@ -15,13 +15,39 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import SQLite from 'react-native-sqlite-storage';
 
-export default function Signup() {
+export default function Signup({navigation}) {
   const numberOfInputs = 4;
   const [userName, onChangeUserName] = useState('');
   const inputsNewPin = Array.from({length: numberOfInputs}, () => useRef());
   const inputsConfirmPin = Array.from({length: numberOfInputs}, () => useRef());
   const [newPin, setNewPin] = useState(Array(numberOfInputs).fill(''));
   const [confirmPin, setConfirmPin] = useState(Array(numberOfInputs).fill(''));
+  const channel_data = [
+    {
+      channelName: 'Channel 1',
+      channelValue: 0,
+      isActive: true,
+      colorCode: '#fef2f2',
+    },
+    {
+      channelName: 'Channel 2',
+      channelValue: 0,
+      isActive: true,
+      colorCode: '#fffbeb',
+    },
+    {
+      channelName: 'Channel 3',
+      channelValue: 0,
+      isActive: true,
+      colorCode: '#f0fdfa',
+    },
+    {
+      channelName: 'Channe; 4',
+      channelValue: 0,
+      isActive: true,
+      colorCode: '#eff6ff',
+    },
+  ];
 
   const handleChangeNewPin = (text, index) => {
     const newInputValues = [...newPin];
@@ -79,28 +105,123 @@ export default function Signup() {
       name: 'iot_dashboard.db',
       location: 'default',
     });
+    try {
+      db.transaction(tx => {
+        tx.executeSql('DROP TABLE users;', [], (tx, results) => {
+          console.log('Dropped users');
+        });
+      });
+      db.transaction(tx => {
+        tx.executeSql('DROP TABLE spectrum_controls;', [], (tx, results) => {
+          console.log('Dropped spectrums');
+        });
+      });
+      db.transaction(tx => {
+        tx.executeSql('DROP TABLE device_nodes;', [], (tx, results) => {
+          console.log('Dropped devices');
+        });
+      });
+      db.transaction(tx => {
+        tx.executeSql('DROP TABLE routines;', [], (tx, results) => {
+          console.log('Dropped routines');
+        });
+      });
+
+      db.transaction(tx => {
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, login_pin TEXT)',
+        );
+        tx.executeSql('INSERT INTO users (username, login_pin) VALUES (?, ?)', [
+          username,
+          pin,
+        ]);
+        console.log('Create and inserted Users');
+        tx.executeSql('SELECT * FROM users', [], (tx, results) => {
+          console.log('Query completed 3');
+          var len = results.rows.length;
+          for (let i = 0; i < len; i++) {
+            let row = results.rows.item(i);
+            console.log(`Username: ${row.username}, Pin: ${row.login_pin}`);
+          }
+        });
+      });
+
+      db.transaction(tx => {
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS device_nodes ( device_id INTEGER PRIMARY KEY AUTOINCREMENT, device_name TEXT, device_serial TEXT, channel_count INTEGER, status INTEGER);',
+        );
+        console.log('Created device table');
+
+        tx.executeSql(
+          'INSERT INTO device_nodes (device_name, device_serial, channel_count, status) VALUES (?, ?,?,?)',
+          ['AndroidWifi', 'AndroidWifi', 4, 1],
+        );
+        console.log('Inserted device table');
+      });
+
+      db.transaction(tx => {
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS spectrum_controls ( spectrum_control_id INTEGER PRIMARY KEY AUTOINCREMENT, channel_data TEXT, lock_ratio INTEGER, spectrum_name TEXT, status INTEGER, device_serial TEXT);',
+        );
+        console.log('Created spectrum table');
+        tx.executeSql(
+          'INSERT INTO spectrum_controls (channel_data, lock_ratio, spectrum_name, status) VALUES (?, ?,?,?)',
+          [JSON.stringify(channel_data), 0, 'Default Spectrum', 1],
+        );
+        console.log('Inserted spectrum table');
+      });
+
+      db.transaction(tx => {
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS routines ( routine_id INTEGER PRIMARY KEY AUTOINCREMENT, routine_name TEXT, routine_time TEXT, routine_action INTEGER, spectrum_data TEXT, days_in_week TEXT, device_serial TEXT);',
+        );
+        console.log('Created routines table');
+      });
+
+      // db.transaction(tx => {
+      //   tx.executeSql(
+      //     'CREATE TABLE IF NOT EXISTS spectrum_controls ( spectrum_control_id INTEGER PRIMARY KEY AUTOINCREMENT, channel_data TEXT, lock_ratio INTEGER, spectrum_name TEXT, status INTEGER);',
+      //   );
+      //   console.log('Created spectrum table');
+      //   tx.executeSql(
+      //     'INSERT INTO spectrum_controls (channel_data, lock_ratio, spectrum_name, status) VALUES (?, ?,?,?)',
+      //     [JSON.stringify(channel_data), 0, 'Default Spectrum', 1],
+      //   );
+      //   tx.executeSql('SELECT * FROM spectrum_controls', [], (tx, results) => {
+      //     console.log('Query completed 4');
+      //     var len = results.rows.length;
+      //     for (let i = 0; i < len; i++) {
+      //       let row = results.rows.item(i);
+      //       console.log(
+      //         `Spectrum Name: ${row.spectrum_name}, Lock Ratio: ${row.status}`,
+      //       );
+      //     }
+      //   });
+      // });
+    } catch (err) {
+      console.log('SQL Error: ' + err);
+    }
+    navigation.navigate('DashboardMain');
+  };
+
+  const createSpectrumTable = () => {
+    const db = SQLite.openDatabase({
+      name: 'iot_dashboard.db',
+      location: 'default',
+    });
+    db.transaction(tx => {
+      tx.executeSql('DROP TABLE spectrum_controls;', [], (tx, results) => {
+        console.log('Query completed');
+      });
+    });
     db.transaction(tx => {
       tx.executeSql(
-        'CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, login_pin TEXT)',
+        'CREATE TABLE IF NOT EXISTS spectrum_controls ( spectrum_control_id int NOT NULL AUTO_INCREMENT, channel_data varchar(1000), lock_ratio int, spectrum_name varchar(100), );',
       );
-      tx.executeSql('INSERT INTO users (username, login_pin) VALUES (?, ?)', [
-        username,
-        pin,
-      ]);
-    });
-
-    db.transaction(tx => {
-      tx.executeSql('SELECT * FROM users', [], (tx, results) => {
-        console.log('Query completed');
-
-        // Get rows with Web SQL Database spec compliance.
-
-        var len = results.rows.length;
-        for (let i = 0; i < len; i++) {
-          let row = results.rows.item(i);
-          console.log(`Username: ${row.username}, Pin: ${row.login_pin}`);
-        }
-      });
+      tx.executeSql(
+        'INSERT INTO spectrum_controls (channel_data, lock_ratio, spectrum_name) VALUES (?, ?,?)',
+        [channel_data, 0, 'Default Spectrum'],
+      );
     });
   };
 
